@@ -97,5 +97,5 @@ The workflow includes:
 
 👤 [Moamena Samir]
 
-* LinkedIn: [[Your Profile](https://www.linkedin.com/in/moamena-samir-12b2a61b3/)]
+* LinkedIn: [[My Profile](https://www.linkedin.com/in/moamena-samir-12b2a61b3/)]
 ---
