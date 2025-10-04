@@ -60,7 +60,7 @@ The workflow includes:
   * Revenue by product category
   * Top 20 products by gross profit
 
-![Dashboard Screenshot]([[Screenshot 2025-10-05 005203.png](https://github.com/MoamenaSamir/E-Commerce-Financial-Analysis/blob/main/Dashboard.png)
+![Dashboard Screenshot]([[Dashboard Screenshot](https://github.com/MoamenaSamir/E-Commerce-Financial-Analysis/blob/main/Dashboard.png)
 
 ---
 
