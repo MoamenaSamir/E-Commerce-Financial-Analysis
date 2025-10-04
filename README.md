@@ -60,7 +60,7 @@ The workflow includes:
   * Revenue by product category
   * Top 20 products by gross profit
 
-![Dashboard Screenshot](3c28f383-adc3-49bd-87b8-9e2f730a6777.png)
+![Dashboard Screenshot](Screenshot 2025-10-05 005203.png)
 
 ---
 
