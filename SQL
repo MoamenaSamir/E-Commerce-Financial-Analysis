@@ -1,0 +1,247 @@
+/*Discover the contents of tables*/
+SELECT * FROM `bigquery-public-data.thelook_ecommerce.order_items` LIMIT 10;
+SELECT * FROM `bigquery-public-data.thelook_ecommerce.orders` LIMIT 10;
+SELECT * FROM `bigquery-public-data.thelook_ecommerce.products` LIMIT 10;
+SELECT * FROM `bigquery-public-data.thelook_ecommerce.users` LIMIT 10;
+
+/*(1) High-level KPI snapshot (Total revenue, orders, customers, AOV)
+-- What is the overall revenue performance of completed orders,
+-- measured by total revenue, total number of orders, total unique customers,
+-- and average order value, excluding canceled and returned transactions?
+*/
+SELECT 
+      ROUND(SUM(OI.sale_price),2) AS Total_Revenue,
+      COUNT(DISTINCT O.order_id) AS Total_Orders,
+      COUNT(DISTINCT O.user_id) AS Total_Customers,
+      ROUND(SUM(OI.sale_price)/NULLIF(COUNT(DISTINCT O.order_id),0),2) AS Avg_Order_Value
+FROM
+     `bigquery-public-data.thelook_ecommerce.order_items` OI
+JOIN
+     `bigquery-public-data.thelook_ecommerce.orders` O 
+USING
+     (order_id)
+WHERE
+     O.status NOT IN ("Cancelled","Returned");
+
+/*(2) Monthly revenue trend (time series)
+-- How has monthly revenue and order volume trended over time,
+-- considering only completed orders and excluding canceled or returned transactions?
+*/
+SELECT
+      DATE_TRUNC(DATE(O.created_at),MONTH) AS Month,
+      ROUND(SUM(OI.sale_price)) AS Total_Revenue,
+      COUNT(DISTINCT O.order_id) As Total_Orders
+FROM
+     `bigquery-public-data.thelook_ecommerce.order_items` OI
+JOIN
+     `bigquery-public-data.thelook_ecommerce.orders` O
+USING
+     (order_id)
+WHERE
+     O.status NOT IN ("Cancelled","Returned")
+GROUP BY 
+     Month
+ORDER BY
+     Month;
+
+/*(3) Revenue & units by product category
+-- Which product categories generate the highest revenue and unit sales,
+-- considering only completed orders and excluding canceled or returned transactions?
+*/
+SELECT
+     P.category,
+     ROUND(SUM(OI.sale_price),2) AS Total_Revenue,
+     COUNT(OI.product_id) AS units_sold
+FROM
+     `bigquery-public-data.thelook_ecommerce.order_items` OI
+JOIN
+     `bigquery-public-data.thelook_ecommerce.orders` O
+USING
+     (order_id)
+JOIN
+     `bigquery-public-data.thelook_ecommerce.products` P
+ON
+     OI.product_id=P.id
+WHERE
+     O.status NOT IN ("Cancelled", "Returned")
+GROUP BY
+     P.category
+ORDER BY
+     Total_Revenue DESC
+LIMIT
+     30;
+
+/*(4) Product profitability — gross profit and gross margin
+-- Which products generate the highest gross profit, and what is their gross margin percentage,
+-- calculated as revenue minus cost, while excluding canceled and returned orders?
+-- Note: products.cost exists in this dataset; if null, we treat as 0.
+*/
+SELECT
+      P.id AS Product_ID,
+      P.name AS Product_Name,
+      ROUND(SUM(OI.sale_price),2) AS Total_Revenue,
+      ROUND(SUM(IFNULL(P.cost,0))*COUNT(OI.product_id),2) AS Total_Sales,
+      ROUND(SUM(OI.sale_price)-SUM(IFNULL(P.cost,0))*COUNT(OI.product_id),2) AS Gross_Profit,
+      ROUND((SUM(OI.sale_price)-SUM(IFNULL(P.cost,0))*COUNT(OI.product_id))/NULLIF(SUM(OI.sale_price),0)*100,2) AS Gross_Margin
+FROM
+     `bigquery-public-data.thelook_ecommerce.order_items` OI
+JOIN
+     `bigquery-public-data.thelook_ecommerce.products` P
+ON
+     OI.product_id = P.id
+WHERE
+     OI.status NOT IN ("Cancelled", "Returend")
+GROUP BY
+     P.name,
+     P.id 
+ORDER BY
+     Gross_Profit DESC
+LIMIT
+     20;
+
+/*(5) Top 10 customers by lifetime spend
+-- Who are the top 10 customers by total spending,
+-- and what are their order counts and average order values,
+-- considering only completed orders and excluding canceled or returned transactions?
+*/
+SELECT
+     U.id AS Customer_ID,
+     CONCAT(U.first_name," ", U.last_name) AS Cutomer_Name,
+     ROUND(SUM(OI.sale_price),2) AS Total_Spending,
+     COUNT(DISTINCT O.order_id) AS Total_Orders,
+     ROUND(SUM(OI.sale_price)/NULLIF(COUNT(DISTINCT OI.product_id),0),2) AS Avg_Order_Values
+FROM
+     `bigquery-public-data.thelook_ecommerce.order_items` OI
+JOIN
+     `bigquery-public-data.thelook_ecommerce.users` U
+ON
+     OI.user_id = U.id
+JOIN
+     `bigquery-public-data.thelook_ecommerce.orders` O
+USING 
+      (order_id)
+WHERE
+     O.status NOT IN ("Cancelled", "Returned")
+GROUP BY
+     U.id,
+     U.first_name,
+     U.last_name
+ORDER BY
+     Total_Spending DESC
+LIMIT
+     10;
+
+/*(6) Repeat customer rate (% customers with >1 order)
+-- What percentage of customers are repeat buyers (placed more than one order),
+-- compared to the total customer base, excluding canceled and returned transactions?
+*/
+WITH
+     Customer_Orders AS (
+SELECT
+     user_id,
+     COUNT(DISTINCT order_id) AS Orders
+FROM
+     `bigquery-public-data.thelook_ecommerce.orders`
+WHERE
+     status NOT IN ("Cancelled", "Returned")
+GROUP BY
+     user_id
+)
+SELECT
+     SUM(CASE WHEN Orders >1 THEN 1 ELSE 0 END) AS Repeated_Customer,
+     COUNT(*) AS Total_Customer,
+     ROUND(SUM(CASE WHEN Orders >1 THEN 1 ELSE 0 END)/NULLIF(COUNT(*),0),2)*100 AS Repeated_Customer_Rate
+FROM
+     Customer_Orders;
+
+/*(7) Revenue by country / region
+-- Which countries generate the highest revenue and order volume,
+-- considering only completed orders and excluding canceled or returned transactions?
+*/
+SELECT
+     U.country,
+     ROUND(SUM(OI.sale_price),2) AS Total_Revenue,
+     COUNT(DISTINCT O.order_id) AS Order_Volume
+FROM
+     `bigquery-public-data.thelook_ecommerce.order_items` OI
+JOIN
+     `bigquery-public-data.thelook_ecommerce.users` U
+ON
+     OI.user_id = U.id
+JOIN
+     `bigquery-public-data.thelook_ecommerce.orders` O
+USING 
+      (order_id)
+WHERE
+     O.status NOT IN ("Cancelled", "Returned")
+GROUP BY
+     U.country
+ORDER BY
+     Total_Revenue DESC
+LIMIT
+     30;
+
+/*(8) Create a temporary table with monthly revenue (useful for dashboards & rolling averages)
+-- What is the monthly revenue trend, and how does a 3-month rolling average
+-- help smooth short-term fluctuations to highlight longer-term revenue patterns,
+-- considering only completed orders and excluding canceled or returned transactions?
+*/
+CREATE TEMPORARY TABLE Monthly_Revenue AS
+SELECT
+      DATE_TRUNC(DATE(O.created_at),MONTH) AS Month,
+      ROUND(SUM(OI.sale_price)) AS Total_Revenue
+FROM
+     `bigquery-public-data.thelook_ecommerce.order_items` OI
+JOIN
+     `bigquery-public-data.thelook_ecommerce.orders` O
+USING
+     (order_id)
+WHERE
+     O.status NOT IN ("Cancelled","Returned")
+GROUP BY
+     Month
+ORDER BY
+     Month;
+
+SELECT
+     Month,
+     Total_Revenue,
+     ROUND(AVG(Total_Revenue) OVER(ORDER BY Month ROWS BETWEEN 2 PRECEDING AND CURRENT ROW),2) AS rolling_3mo_avg
+FROM
+     Monthly_Revenue
+ORDER BY 
+     Month;
+
+/*Create a View that joins the tables once and exposes a clean fact table for visulaize easy.*/
+CREATE OR REPLACE VIEW `feisty-vector-331519.Project.ecommerce_fact` AS
+SELECT
+   OI.order_id,
+   OI.product_id,
+   OI.user_id,
+   OI.sale_price,
+   OI.status AS item_status,
+   O.created_at,
+   O.status AS order_status,
+   P.category,
+   P.name AS product_name,
+   P.cost,
+   U.first_name,
+   U.last_name,
+   U.country,
+   CO.order_count
+FROM `bigquery-public-data.thelook_ecommerce.order_items` OI
+JOIN `bigquery-public-data.thelook_ecommerce.orders` O
+  ON OI.order_id = O.order_id
+JOIN `bigquery-public-data.thelook_ecommerce.products` P
+  ON OI.product_id = P.id
+JOIN `bigquery-public-data.thelook_ecommerce.users` U
+  ON OI.user_id = U.id
+LEFT JOIN (
+    SELECT user_id, COUNT(DISTINCT order_id) AS order_count
+    FROM `bigquery-public-data.thelook_ecommerce.orders`
+    WHERE status NOT IN ("Cancelled","Returned")
+    GROUP BY user_id
+) CO
+  ON OI.user_id = CO.user_id;
+
+
