@@ -39,6 +39,8 @@ The workflow includes:
 
 ## SQL Highlights
 
+* **Source:** [`SQL`](https://github.com/MoamenaSamir/E-Commerce-Financial-Analysis/blob/main/SQL)
+
 * **Aggregations:** SUM, COUNT, AVG for financial KPIs
 * **JOINS:** Combining orders, items, products, and users
 * **GROUP BY + HAVING:** Filtering by profitable categories
